@@ -123,10 +123,14 @@ async function readPath(
 ): Promise<Response> {
   const { owner, repo, ref, platform, tail } = route;
   const origin = new URL(request.url).origin;
-  const permalinkUrl = `${origin}${new URL(request.url).pathname}`.replace(
-    /\/(artifact|qr\.png|qr\.svg)$/,
-    "",
-  );
+  // The canonical permalink for this resource: every sub-route (/artifact,
+  // /qr.png, /qr.svg, .json) maps back to the one HTML page. Kept in step with
+  // the canonicalisation in signing.ts -- and `.json` must be stripped here
+  // too, or `installUrl` in the JSON body would point at the JSON endpoint
+  // itself instead of the install page.
+  const permalinkUrl = `${origin}${new URL(request.url).pathname}`
+    .replace(/\/(artifact|qr\.png|qr\.svg)$/, "")
+    .replace(/\.json$/, "");
 
   // QR images are pure functions of the URL: no KV read, no EAS call. Serving
   // them before the rate limiter also means a comment full of images cannot
