@@ -42,18 +42,29 @@ async function findExisting(
     per_page: 100,
   });
 
+  // A Bot-authored match is the strongest signal, so it wins outright. But
+  // requiring it would break every repo that passes a personal access token in
+  // `github-token` (a common way to let the comment trigger other workflows):
+  // that comment is authored by a User, so we would never find our own comment
+  // again -- posting a duplicate on every push AND losing the epl-state block,
+  // which silently disables cancel-superseded. Fall back to the first
+  // marker-anchored comment instead.
+  let fallback: ExistingComment | null = null;
+
   for await (const { data } of iterator) {
     for (const comment of data) {
-      // startsWith, not includes: a human quoting our marker in a reply must
-      // not be mistaken for the bot's own comment. The Bot check is the
-      // second half of that guard.
+      // startsWith, not includes: a human quoting our marker mid-reply must not
+      // be mistaken for the sticky comment. Anchoring to the first line is what
+      // makes this safe without the author-type check.
       const body = comment.body ?? "";
-      if (body.startsWith(opts.marker) && comment.user?.type === "Bot") {
-        return { id: comment.id, body: comment.body, html_url: comment.html_url };
-      }
+      if (!body.startsWith(opts.marker)) continue;
+
+      const found = { id: comment.id, body: comment.body, html_url: comment.html_url };
+      if (comment.user?.type === "Bot") return found;
+      fallback ??= found;
     }
   }
-  return null;
+  return fallback;
 }
 
 export async function upsertStickyComment(opts: UpsertOptions): Promise<UpsertResult> {

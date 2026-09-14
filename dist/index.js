@@ -35024,8 +35024,25 @@ class RefError extends Error {
         this.name = "RefError";
     }
 }
-/** Control characters, space, DEL, and the ~ ^ : ? * [ \ set git forbids. */
-const FORBIDDEN_REF_CHARS = /[ - ~^:?*[\\]/;
+/**
+ * The punctuation `git check-ref-format` forbids outright.
+ *
+ * Written as a code-point scan rather than a regex character class on purpose:
+ * the class would need a control-character range, and both linters and
+ * formatters mangle literal control characters inside a regex literal.
+ */
+const FORBIDDEN_REF_PUNCTUATION = new Set(["~", "^", ":", "?", "*", "[", "\\"]);
+function hasForbiddenRefChar(ref) {
+    for (const char of ref) {
+        const code = char.codePointAt(0) ?? 0;
+        // Control characters (0x00-0x1f), space (0x20) and DEL (0x7f).
+        if (code <= 0x20 || code === 0x7f)
+            return true;
+        if (FORBIDDEN_REF_PUNCTUATION.has(char))
+            return true;
+    }
+    return false;
+}
 /**
  * Normalise and validate a branch ref, applying the rules of
  * `git check-ref-format` that matter for us.
@@ -35041,7 +35058,7 @@ function normalizeRef(input) {
         throw new RefError("empty");
     if (ref.length > 255)
         throw new RefError("longer than 255 characters");
-    if (FORBIDDEN_REF_CHARS.test(ref)) {
+    if (hasForbiddenRefChar(ref)) {
         throw new RefError("contains a character git forbids in a ref name");
     }
     if (ref.includes(".."))
@@ -35130,18 +35147,29 @@ async function findExisting(octokit, opts) {
         issue_number: opts.issueNumber,
         per_page: 100,
     });
+    // A Bot-authored match is the strongest signal, so it wins outright. But
+    // requiring it would break every repo that passes a personal access token in
+    // `github-token` (a common way to let the comment trigger other workflows):
+    // that comment is authored by a User, so we would never find our own comment
+    // again -- posting a duplicate on every push AND losing the epl-state block,
+    // which silently disables cancel-superseded. Fall back to the first
+    // marker-anchored comment instead.
+    let fallback = null;
     for await (const { data } of iterator) {
         for (const comment of data) {
-            // startsWith, not includes: a human quoting our marker in a reply must
-            // not be mistaken for the bot's own comment. The Bot check is the
-            // second half of that guard.
+            // startsWith, not includes: a human quoting our marker mid-reply must not
+            // be mistaken for the sticky comment. Anchoring to the first line is what
+            // makes this safe without the author-type check.
             const body = comment.body ?? "";
-            if (body.startsWith(opts.marker) && comment.user?.type === "Bot") {
-                return { id: comment.id, body: comment.body, html_url: comment.html_url };
-            }
+            if (!body.startsWith(opts.marker))
+                continue;
+            const found = { id: comment.id, body: comment.body, html_url: comment.html_url };
+            if (comment.user?.type === "Bot")
+                return found;
+            fallback ??= found;
         }
     }
-    return null;
+    return fallback;
 }
 async function upsertStickyComment(opts) {
     const octokit = getOctokit(opts.token);
@@ -36940,6 +36968,19 @@ function boolInput(name, fallback) {
         return fallback;
     return raw === "true" || raw === "1" || raw === "yes";
 }
+function numberInput(name, fallback) {
+    const raw = getInput(name).trim();
+    if (raw === "")
+        return fallback;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0) {
+        // Number("40m") is NaN, and a NaN timeout makes waitForBuilds return
+        // instantly -- silently doing nothing instead of waiting. Fail loudly, at
+        // input-parse time, before any build is triggered.
+        throw new Error(`The \`${name}\` input must be a positive number; got \`${raw}\`.`);
+    }
+    return value;
+}
 function requiredInput(name) {
     // `required: true` in action.yml is documentation, not enforcement --
     // GitHub does not check it. Validate explicitly.
@@ -36981,7 +37022,7 @@ async function run() {
     const shouldComment = boolInput("comment", true);
     const cancelSuperseded = boolInput("cancel-superseded", true);
     const shouldWait = boolInput("wait-for-build", false);
-    const waitTimeout = Number(getInput("wait-timeout-minutes").trim() || "40");
+    const waitTimeout = numberInput("wait-timeout-minutes", 40);
     const refreshAdHoc = boolInput("refresh-ad-hoc-provisioning-profile", false);
     const workingDirectory = getInput("working-directory").trim() || process.cwd();
     // NEVER github.ref: on pull_request that is `refs/pull/N/merge`, and

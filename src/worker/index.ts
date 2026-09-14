@@ -25,7 +25,12 @@ import {
   type PointerStatusJson,
   RESOLVE_TTL_MS,
 } from "../shared/types.js";
-import { allowedArtifactHosts, assertArtifactUrl, buildPageUrl } from "../shared/urls.js";
+import {
+  allowedArtifactHosts,
+  assertArtifactUrl,
+  buildPageUrl,
+  permalink,
+} from "../shared/urls.js";
 import { resolveBuild } from "./eas.js";
 import { getPointer, putPointer } from "./kv.js";
 import { qrPng, qrSvg } from "./qr.js";
@@ -52,6 +57,15 @@ function json(body: unknown, status: number, extra: Record<string, string> = {})
       ...extra,
     },
   });
+}
+
+/** decodeURIComponent, but a malformed escape means "no such route". */
+function safeDecode(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -89,8 +103,9 @@ export function parseRoute(pathname: string): ParsedRoute | null {
   if (!isPlatform(platformSegment)) return null;
   if (segments.length < 3) return null;
 
-  const owner = decodeURIComponent(segments.shift() ?? "");
-  const repo = decodeURIComponent(segments.shift() ?? "");
+  const owner = safeDecode(segments.shift() ?? "");
+  const repo = safeDecode(segments.shift() ?? "");
+  if (owner === null || repo === null) return null;
   if (!isValidRepoPart(owner) || !isValidRepoPart(repo)) return null;
   if (segments.length === 0) return null;
 
@@ -99,7 +114,10 @@ export function parseRoute(pathname: string): ParsedRoute | null {
     // Exactly one decode pass per segment -- a branch may legally contain `%`.
     ref = normalizeRef(decodeRefPath(segments));
   } catch (err) {
-    if (err instanceof RefError) return null;
+    // A malformed escape is simply "no such route". Without the URIError arm
+    // this throws out of fetch() entirely, and the client gets Cloudflare's
+    // error page instead of our hardened 404.
+    if (err instanceof RefError || err instanceof URIError) return null;
     throw err;
   }
 
@@ -123,14 +141,14 @@ async function readPath(
 ): Promise<Response> {
   const { owner, repo, ref, platform, tail } = route;
   const origin = new URL(request.url).origin;
-  // The canonical permalink for this resource: every sub-route (/artifact,
-  // /qr.png, /qr.svg, .json) maps back to the one HTML page. Kept in step with
-  // the canonicalisation in signing.ts -- and `.json` must be stripped here
-  // too, or `installUrl` in the JSON body would point at the JSON endpoint
-  // itself instead of the install page.
-  const permalinkUrl = `${origin}${new URL(request.url).pathname}`
-    .replace(/\/(artifact|qr\.png|qr\.svg)$/, "")
-    .replace(/\.json$/, "");
+  // Rebuilt from the PARSED route rather than edited out of the request path.
+  // Deriving it by stripping suffixes off request.url leaks whatever the
+  // client sent through -- a trailing slash, a doubled slash, an odd
+  // encoding -- into the QR payload, into `installUrl`, and into the
+  // /artifact href on the rendered page, where it 404s. Rebuilding makes every
+  // sub-route (/artifact, /qr.png, /qr.svg, .json) resolve to one canonical
+  // URL by construction.
+  const permalinkUrl = permalink(origin, owner, repo, ref, platform);
 
   // QR images are pure functions of the URL: no KV read, no EAS call. Serving
   // them before the rate limiter also means a comment full of images cannot
@@ -182,11 +200,53 @@ async function readPath(
   let pointer = await getPointer(env, owner, repo, ref, platform);
 
   if (pointer && isStale(pointer, Date.now())) {
-    const resolved = await resolveBuild(pointer.buildId, env);
-    pointer = { ...pointer, ...resolved };
-    // waitUntil so the KV write never delays the response the reviewer is
-    // waiting on.
-    ctx.waitUntil(putPointer(env, owner, repo, ref, platform, pointer));
+    const snapshot = pointer;
+    const resolved = await resolveBuild(snapshot.buildId, env);
+    const merged: BuildPointer = { ...snapshot, ...resolved };
+
+    // A lookup we could not COMPLETE must not destroy a pointer we already
+    // confirmed ready. Without this, one EAS timeout turns a working install
+    // link into "Could not reach EAS" for a build whose artifact is still
+    // sitting there, unexpired and allow-listed.
+    if (
+      resolved.unreachable &&
+      snapshot.status === "ready" &&
+      snapshot.artifactUrl &&
+      (!snapshot.expirationDate || Date.parse(snapshot.expirationDate) > Date.now())
+    ) {
+      merged.status = "ready";
+      // Leave resolvedAt as it was, so the pointer stays stale and the very
+      // next read retries EAS instead of waiting out the TTL.
+      merged.resolvedAt = snapshot.resolvedAt;
+    }
+
+    pointer = merged;
+
+    // A lookup that never completed has nothing worth storing, and writing
+    // "unavailable" over a good record would destroy it permanently -- the
+    // preservation above only rescues the CURRENT response. Skip the write and
+    // let the next read retry EAS against the last known-good pointer.
+    if (!resolved.unreachable) {
+      // Cache the answer back -- but NEVER resurrect a superseded pointer. KV
+      // has no compare-and-swap, the read may have come from a 30s cache, and
+      // resolveBuild can take up to two 5s attempts, so POST /api/register may
+      // have replaced this key while we were in flight. Re-read and bail out if
+      // it did; otherwise we would overwrite the newest build with the previous
+      // one, the exact opposite of the guarantee this product makes.
+      ctx.waitUntil(
+        (async () => {
+          const current = await getPointer(env, owner, repo, ref, platform);
+          if (
+            !current ||
+            current.buildId !== snapshot.buildId ||
+            current.registeredAt !== snapshot.registeredAt
+          ) {
+            return;
+          }
+          await putPointer(env, owner, repo, ref, platform, { ...current, ...resolved });
+        })(),
+      );
+    }
   }
 
   if (tail === "json") {

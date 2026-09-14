@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`rendered states > matches the expected shape end to end 1`] = `
+"<!-- expo-preview-links:v1:victorhenrion/expo-preview-links -->
+<!-- epl-state:{"pr":42,"sha":"0123456789abcdef0123456789abcdef01234567","builds":[{"platform":"ios","buildId":"8a7b6c5d-4e3f-4a2b-9c8d-7e6f5a4b3c2d"}]} -->
+### 📱 Expo preview builds
+
+Branch \`feature/login\` · commit \`0123456\` · profile \`preview\`
+
+| | Platform | Status | Install | Scan |
+|---|---|---|---|---|
+| 🍎 | **iOS** | 🟢 ready | **[Install](https://links.example.com/victorhenrion/expo-preview-links/feature/login/ios)** | <img src="https://links.example.com/victorhenrion/expo-preview-links/feature/login/ios/qr.png?c=0123456789ab" alt="QR code for the iOS build" width="120" height="120"> |
+<details>
+<summary>Permalinks & troubleshooting</summary>
+These links are **stable**: they always resolve to the latest build for this branch,
+so you can bookmark them and they keep working after every new push.
+- **iOS** — https://links.example.com/victorhenrion/expo-preview-links/feature/login/ios
+**Nothing happens when I tap Install on iPhone?**  
+You are probably in an in-app browser (Slack, Gmail, Teams). Open the link in Safari.
+**"Unable to Install" on iPhone?**  
+Your device UDID is not in the build's provisioning profile. Register it with
+\`eas device:create\`, then re-run with \`refresh-ad-hoc-provisioning-profile: true\`.
+**The build says expired?**  
+EAS keeps artifacts for a limited time. Push a commit to rebuild — the same link
+will start working again.
+</details>
+<sub>Posted by [expo-preview-links](https://github.com/victorhenrion/expo-preview-links)</sub>"
+`;

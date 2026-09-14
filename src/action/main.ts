@@ -28,6 +28,19 @@ function boolInput(name: string, fallback: boolean): boolean {
   return raw === "true" || raw === "1" || raw === "yes";
 }
 
+function numberInput(name: string, fallback: number): number {
+  const raw = core.getInput(name).trim();
+  if (raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    // Number("40m") is NaN, and a NaN timeout makes waitForBuilds return
+    // instantly -- silently doing nothing instead of waiting. Fail loudly, at
+    // input-parse time, before any build is triggered.
+    throw new Error(`The \`${name}\` input must be a positive number; got \`${raw}\`.`);
+  }
+  return value;
+}
+
 function requiredInput(name: string): string {
   // `required: true` in action.yml is documentation, not enforcement --
   // GitHub does not check it. Validate explicitly.
@@ -73,7 +86,7 @@ async function run(): Promise<void> {
   const shouldComment = boolInput("comment", true);
   const cancelSuperseded = boolInput("cancel-superseded", true);
   const shouldWait = boolInput("wait-for-build", false);
-  const waitTimeout = Number(core.getInput("wait-timeout-minutes").trim() || "40");
+  const waitTimeout = numberInput("wait-timeout-minutes", 40);
   const refreshAdHoc = boolInput("refresh-ad-hoc-provisioning-profile", false);
   const workingDirectory = core.getInput("working-directory").trim() || process.cwd();
 

@@ -88,7 +88,12 @@ export type ResolvedBuild = Partial<
     | "errorMessage"
     | "errorDocsUrl"
   >
-> & { status: BuildState; resolvedAt: string };
+> & {
+  status: BuildState;
+  resolvedAt: string;
+  /** True only when we could not reach EAS at all -- not when EAS answered. */
+  unreachable?: boolean;
+};
 
 async function queryEas(buildId: string, token?: string): Promise<EasBuild | null> {
   const headers: Record<string, string> = { "content-type": "application/json" };
@@ -161,7 +166,10 @@ export async function resolveBuild(buildId: string, env: Env): Promise<ResolvedB
     }
   }
 
-  if (!build) return { status: "unavailable", resolvedAt };
+  // `unreachable` distinguishes "EAS gave us no answer" from "EAS says this
+  // build is unusable". The read path uses it to keep serving a previously
+  // confirmed artifact through a transient EAS outage.
+  if (!build) return { status: "unavailable", resolvedAt, unreachable: true };
 
   const status = mapStatus(build, now);
   const resolved: ResolvedBuild = { status, resolvedAt };
@@ -171,10 +179,18 @@ export async function resolveBuild(buildId: string, env: Env): Promise<ResolvedB
   if (build.appIdentifier) resolved.appIdentifier = build.appIdentifier;
   if (build.expirationDate) resolved.expirationDate = build.expirationDate;
   if (typeof build.isForIosSimulator === "boolean") resolved.isSimulator = build.isForIosSimulator;
-  if (typeof build.queuePosition === "number") resolved.queuePosition = build.queuePosition;
-  if (typeof build.estimatedWaitTimeLeftSeconds === "number") {
-    resolved.estimatedWaitSeconds = build.estimatedWaitTimeLeftSeconds;
-  }
+  // Queue data is meaningful ONLY while the build waits; EAS nulls both fields
+  // the moment it starts. Assigned UNCONDITIONALLY (undefined when EAS has no
+  // number) so the spread merge on the read path CLEARS the previous value: an
+  // own property whose value is undefined overwrites in a spread, whereas an
+  // absent property silently preserves whatever was stored. Otherwise the page
+  // keeps claiming "queue position 12" for the whole build, and afterwards.
+  resolved.queuePosition =
+    typeof build.queuePosition === "number" ? build.queuePosition : undefined;
+  resolved.estimatedWaitSeconds =
+    typeof build.estimatedWaitTimeLeftSeconds === "number"
+      ? build.estimatedWaitTimeLeftSeconds
+      : undefined;
   if (build.error?.errorCode) resolved.errorCode = build.error.errorCode;
   if (build.error?.message) resolved.errorMessage = build.error.message;
   if (build.error?.docsUrl) resolved.errorDocsUrl = build.error.docsUrl;
