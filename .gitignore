@@ -1,11 +1,11 @@
 node_modules/
 .DS_Store
 
-# build output
-dist/
-!action/dist/
+# Build output.
+# NOTE: dist/ is deliberately NOT ignored. GitHub Actions runs dist/index.js
+# directly and never installs node_modules for an action, so the bundle has to
+# be committed. check-dist.yml fails the PR if it drifts from the sources.
 .wrangler/
-worker-configuration.d.ts
 
 # test / coverage
 coverage/
