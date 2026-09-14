@@ -1,0 +1,11 @@
+{
+  // The action bundle compiles only src/action and src/shared. Without this the
+  // rollup TypeScript plugin pulls the Worker sources into the same program,
+  // where the Cloudflare ambient types are not in scope.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": false
+  },
+  "include": ["src/action/**/*.ts", "src/shared/**/*.ts"]
+}

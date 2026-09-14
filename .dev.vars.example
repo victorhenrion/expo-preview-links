@@ -1,0 +1,11 @@
+# Copy to `.dev.vars` for local `wrangler dev`. Never commit `.dev.vars`.
+# In production these are set with `wrangler secret put <NAME>`.
+
+# Expo ROBOT user access token (Expo dashboard -> account settings -> Access tokens).
+# Do NOT use a personal token: personal tokens act as the human across every account
+# and organisation they can reach. Robot users are per-account and role-limited.
+# Only required when your Expo project has unauthenticated build access disabled.
+EXPO_TOKEN=
+
+# Only needed when GATING_MODE=signed.
+PERMALINK_HMAC_SECRET=

@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "expo-preview-links",
+  "main": "src/worker/index.ts",
+
+  // Workers with a compatibility_date >= 2026-08-04 get nodejs_compat and
+  // nodejs_compat_v2 by default. Do NOT add compatibility_flags for them --
+  // they are ignored, and the docs say to omit them from new configurations.
+  "compatibility_date": "2026-09-14",
+
+  "observability": { "enabled": true },
+
+  // Zero-infra default: a free *.workers.dev subdomain, no custom domain needed.
+  // Once you add a custom domain below, set this to false IN THIS FILE (turning it
+  // off only in the dashboard is undone by the next `wrangler deploy`), otherwise
+  // /api/register stays reachable on a second, unprotected hostname.
+  "workers_dev": true,
+
+  // Create with:  wrangler kv namespace create BUILDS
+  // then paste the printed id here. The field is `id`, not `namespace_id`.
+  "kv_namespaces": [{ "binding": "BUILDS", "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID" }],
+
+  // `period` must be exactly 10 or 60. Each binding needs its OWN namespace_id:
+  // counters are shared per namespace_id across bindings AND across Workers on the
+  // same account, so a shared id would let read traffic exhaust the write budget.
+  "ratelimits": [
+    { "name": "RL_READ", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } },
+    { "name": "RL_REGISTER", "namespace_id": "1002", "simple": { "limit": 20, "period": 60 } },
+    { "name": "RL_BADAUTH", "namespace_id": "1003", "simple": { "limit": 10, "period": 60 } }
+  ],
+
+  "vars": {
+    // "public"  - anyone with the permalink can open it (default; matches Expo's own
+    //             internal-distribution behaviour, where build URLs are available to
+    //             anybody who has the URL).
+    // "signed"  - require ?t=<exp>.<hmac>; set the PERMALINK_HMAC_SECRET secret and
+    //             the action's `permalink-ttl-days` input.
+    "GATING_MODE": "public"
+  }
+
+  // ---------------------------------------------------------------------------
+  // Optional hardening / customisation. Uncomment as needed.
+  //
+  // Serve from your own domain (requires an active Cloudflare zone). Remember to
+  // flip "workers_dev" to false above once this is live.
+  // "routes": [{ "pattern": "preview.example.com", "custom_domain": true }],
+  //
+  // "vars": {
+  //   "GATING_MODE": "public",
+  //   "OIDC_AUDIENCE": "https://preview.example.com",   // default: this Worker's own origin
+  //   "ALLOWED_REPOS": "acme/mobile-app,acme/other-app", // default: any repo (TOFU-bound)
+  //   "ALLOW_SELF_HOSTED": "false",                      // allow self-hosted runners
+  //   "REQUIRED_JOB_WORKFLOW_REF": "acme/mobile-app/.github/workflows/preview.yml",
+  //   "ALLOWED_ARTIFACT_HOSTS": "expo.dev,api.expo.dev"  // self-hosted/enterprise EAS
+  // }
+  //
+  // Secrets (never put these in this file -- use `wrangler secret put NAME`):
+  //   EXPO_TOKEN             an Expo ROBOT token; needed to resolve builds whose
+  //                          project has unauthenticated access disabled.
+  //   PERMALINK_HMAC_SECRET  only when GATING_MODE is "signed".
+  // ---------------------------------------------------------------------------
+}

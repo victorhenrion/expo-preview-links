@@ -1,0 +1,82 @@
+# This file MUST live at the repository root. An action.yml in a subdirectory
+# can be consumed as `owner/repo/path@ref`, but it can never be listed on the
+# GitHub Marketplace.
+name: "Expo Preview Links"
+description: "Build iOS and Android previews with EAS and comment stable per-branch install permalinks on the pull request."
+author: "victorhenrion"
+
+branding:
+  icon: "smartphone"
+  color: "purple"
+
+inputs:
+  base-url:
+    description: "Origin of your deployed expo-preview-links Worker, e.g. https://expo-preview-links.acme.workers.dev"
+    required: true
+  platform:
+    description: "Which platforms to build: ios, android, or all."
+    required: false
+    default: "all"
+  profile:
+    description: "The eas.json build profile to use. Must be an internal-distribution profile."
+    required: false
+    default: "preview"
+  github-token:
+    description: "Token used to post the pull request comment. Needs `pull-requests: write`."
+    required: false
+    default: ${{ github.token }}
+  comment:
+    description: "Post/update the sticky pull request comment."
+    required: false
+    default: "true"
+  cancel-superseded:
+    description: >-
+      Cancel the in-flight EAS builds from this PR's previous push. Strongly
+      recommended: free EAS plans stop building when the monthly quota is
+      exhausted, and more than 50 pending builds per platform are rejected.
+    required: false
+    default: "true"
+  wait-for-build:
+    description: >-
+      Keep the job running until the builds finish, so the comment shows the
+      final status. Costs CI minutes; the permalinks stay live either way.
+    required: false
+    default: "false"
+  wait-timeout-minutes:
+    description: "How long to wait when wait-for-build is true."
+    required: false
+    default: "40"
+  refresh-ad-hoc-provisioning-profile:
+    description: >-
+      Re-generate the iOS ad hoc provisioning profile so newly registered
+      devices are included. The first thing to try when testers report
+      "Unable to Install". Requires EXPO_ASC_API_KEY_PATH, EXPO_ASC_KEY_ID and
+      EXPO_ASC_ISSUER_ID in the environment.
+    required: false
+    default: "false"
+  working-directory:
+    description: "Directory containing eas.json."
+    required: false
+    default: ${{ github.workspace }}
+  message:
+    description: "Build message shown in the Expo dashboard. Defaults to the PR number and title."
+    required: false
+
+outputs:
+  comment-id:
+    description: "Numeric id of the sticky pull request comment."
+  comment-url:
+    description: "HTML URL of the sticky pull request comment."
+  ios-url:
+    description: "Stable permalink to the latest iOS build for this branch."
+  android-url:
+    description: "Stable permalink to the latest Android build for this branch."
+  ios-build-id:
+    description: "EAS build id of the iOS build this run started."
+  android-build-id:
+    description: "EAS build id of the Android build this run started."
+
+runs:
+  # node20 is removed from GitHub-hosted runners on 2026-09-23.
+  using: "node24"
+  main: "dist/index.js"

@@ -1,0 +1,2 @@
+dist/** -diff linguist-generated=true
+pnpm-lock.yaml -diff linguist-generated=true
