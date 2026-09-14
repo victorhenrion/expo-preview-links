@@ -13,8 +13,8 @@
  * repo stores no secret for the Worker, only the EXPO_TOKEN it needs anyway.
  */
 
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { JWTPayload } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { bindingKey } from "../shared/ref.js";
 import type { RepoBinding } from "../shared/types.js";
 import { getBinding, putBinding } from "./kv.js";

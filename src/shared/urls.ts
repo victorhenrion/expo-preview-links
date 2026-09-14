@@ -113,7 +113,8 @@ export function assertArtifactUrl(raw: string, allowed: Iterable<string>): URL {
     throw new ArtifactUrlError("not a valid absolute URL");
   }
 
-  if (url.protocol !== "https:") throw new ArtifactUrlError(`protocol ${url.protocol} is not https`);
+  if (url.protocol !== "https:")
+    throw new ArtifactUrlError(`protocol ${url.protocol} is not https`);
   if (url.username !== "" || url.password !== "") {
     throw new ArtifactUrlError("contains embedded credentials");
   }

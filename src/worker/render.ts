@@ -15,8 +15,8 @@
  * error string is attacker-controlled text and MUST go through escapeHtml.
  */
 
-import { buildPageUrl, iosInstallUrl } from "../shared/urls.js";
 import type { BuildPointer, Platform } from "../shared/types.js";
+import { buildPageUrl, iosInstallUrl } from "../shared/urls.js";
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -134,7 +134,10 @@ function permalinkFooter(ctx: RenderContext): string {
 function commonRows(p: BuildPointer): Array<[string, string]> {
   const rows: Array<[string, string]> = [];
   if (p.appVersion) {
-    rows.push(["Version", p.appBuildVersion ? `${p.appVersion} (${p.appBuildVersion})` : p.appVersion]);
+    rows.push([
+      "Version",
+      p.appBuildVersion ? `${p.appVersion} (${p.appBuildVersion})` : p.appVersion,
+    ]);
   }
   if (p.appIdentifier) rows.push(["Bundle id", p.appIdentifier]);
   if (p.sha) rows.push(["Commit", p.sha.slice(0, 7)]);

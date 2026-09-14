@@ -1,0 +1,52 @@
+# The recommended variant if you are on a free EAS plan.
+#
+# Builds only run when a pull request carries the `preview` label, and then on
+# every subsequent push while the label is present. This protects against the
+# two hard EAS limits that a build-on-every-push bot will otherwise hit:
+#
+#   - free plans stop building once the monthly quota is exhausted and cannot
+#     incur overage, so one busy week can take previews down for the month;
+#   - more than 50 pending builds per platform causes new builds to be
+#     REJECTED outright.
+name: Expo preview (label gated)
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: expo-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'preview')
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - uses: victorhenrion/expo-preview-links@v1
+        with:
+          base-url: https://expo-preview-links.YOUR-SUBDOMAIN.workers.dev

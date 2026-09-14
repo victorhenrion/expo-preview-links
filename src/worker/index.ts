@@ -19,8 +19,8 @@
 
 import { decodeRefPath, isValidRepoPart, normalizeRef, RefError } from "../shared/ref.js";
 import {
-  isPlatform,
   type BuildPointer,
+  isPlatform,
   type Platform,
   type PointerStatusJson,
   RESOLVE_TTL_MS,
@@ -29,8 +29,8 @@ import { allowedArtifactHosts, assertArtifactUrl, buildPageUrl } from "../shared
 import { resolveBuild } from "./eas.js";
 import { getPointer, putPointer } from "./kv.js";
 import { qrPng, qrSvg } from "./qr.js";
-import { renderInstallPage, renderLanding, securityHeaders } from "./render.js";
 import { handleRegister } from "./register.js";
+import { renderInstallPage, renderLanding, securityHeaders } from "./render.js";
 import { verifySignedPermalink } from "./signing.js";
 
 type Tail = "page" | "artifact" | "qr.png" | "qr.svg" | "json";
@@ -46,7 +46,11 @@ interface ParsedRoute {
 function json(body: unknown, status: number, extra: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...extra,
+    },
   });
 }
 
@@ -214,7 +218,10 @@ async function readPath(
     // hand with `wrangler kv key put`.
     let target: URL;
     try {
-      target = assertArtifactUrl(pointer.artifactUrl, allowedArtifactHosts(env.ALLOWED_ARTIFACT_HOSTS));
+      target = assertArtifactUrl(
+        pointer.artifactUrl,
+        allowedArtifactHosts(env.ALLOWED_ARTIFACT_HOSTS),
+      );
     } catch {
       return json({ error: "artifact_host_not_allowed" }, 502);
     }

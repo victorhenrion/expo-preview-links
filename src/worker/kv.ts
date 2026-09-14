@@ -17,8 +17,8 @@ import { bindingKey, pointerKey } from "../shared/ref.js";
 import {
   type BuildPointer,
   KV_CACHE_TTL_SECONDS,
-  POINTER_TTL_SECONDS,
   type Platform,
+  POINTER_TTL_SECONDS,
   type RepoBinding,
 } from "../shared/types.js";
 

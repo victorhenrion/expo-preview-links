@@ -19,8 +19,8 @@
  * back null or errors and a token is configured, we retry with it.
  */
 
-import { allowedArtifactHosts, assertArtifactUrl } from "../shared/urls.js";
 import type { BuildPointer, BuildState } from "../shared/types.js";
+import { allowedArtifactHosts, assertArtifactUrl } from "../shared/urls.js";
 
 const GRAPHQL_ENDPOINT = "https://api.expo.dev/graphql";
 const TIMEOUT_MS = 5_000;

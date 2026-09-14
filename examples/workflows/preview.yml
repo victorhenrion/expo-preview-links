@@ -1,0 +1,63 @@
+# Copy this into .github/workflows/preview.yml in your Expo app repository.
+#
+# QUOTA WARNING: this fires on every push to every open pull request. EAS free
+# plans have a monthly build quota that cannot go into overage, and more than 50
+# pending builds per platform are rejected outright. If that matters to you, use
+# preview-label-gated.yml instead, which only builds when a PR is labelled.
+name: Expo preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Naming any scope sets every unnamed scope to `none`, so `contents: read` has
+# to be listed explicitly or checkout fails on a private repository.
+permissions:
+  contents: read # checkout
+  pull-requests: write # post the sticky comment
+  id-token: write # mint the OIDC token the Worker verifies
+
+concurrency:
+  group: expo-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    # THE FORK GATE. Secrets are withheld from fork pull requests and `id-token`
+    # is capped at `read`, so this job cannot work for a fork even in principle.
+    # Do not "fix" this with pull_request_target: eas-cli executes app.config.js,
+    # which would hand EXPO_TOKEN and a write-scoped GITHUB_TOKEN to arbitrary
+    # code from the fork.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Otherwise the token is written into .git/config where any later step
+          # (including a dependency's postinstall) can read it.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Delegated deliberately: this installs and authenticates eas-cli, and
+      # handles caching. There is no reason to reimplement it.
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          # An Expo ROBOT user token, NOT a personal access token: personal
+          # tokens act as the human across every account and organisation they
+          # can reach.
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - uses: victorhenrion/expo-preview-links@v1
+        with:
+          # The origin of your deployed Worker.
+          base-url: https://expo-preview-links.YOUR-SUBDOMAIN.workers.dev
+          platform: all
+          profile: preview

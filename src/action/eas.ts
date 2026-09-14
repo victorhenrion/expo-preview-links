@@ -175,10 +175,7 @@ export async function triggerBuilds(options: TriggerOptions): Promise<StartedBui
  * than 50 pending builds per platform causes new builds to be rejected. A
  * build that already finished cannot be cancelled, and that is not an error.
  */
-export async function cancelBuilds(
-  buildIds: string[],
-  workingDirectory: string,
-): Promise<number> {
+export async function cancelBuilds(buildIds: string[], workingDirectory: string): Promise<number> {
   let cancelled = 0;
   for (const id of buildIds) {
     const code = await exec.exec("eas", ["build:cancel", id, "--non-interactive"], {

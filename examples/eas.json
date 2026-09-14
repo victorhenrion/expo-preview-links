@@ -1,0 +1,39 @@
+{
+  "//": [
+    "The build profile this toolkit assumes. Copy the `preview` profile into your",
+    "own eas.json.",
+    "",
+    "distribution: internal is the load-bearing setting.",
+    "  - On Android it switches the default gradle command to produce an APK.",
+    "    An .aab is NOT installable from a link, so a profile without this",
+    "    silently serves a file nobody can install.",
+    "  - On iOS it produces an ad hoc build, whose provisioning profile bakes in",
+    "    a device UDID allow-list AT BUILD TIME. Register testers with",
+    "    `eas device:create` and rebuild with",
+    "    `refresh-ad-hoc-provisioning-profile: true` when you add someone new."
+  ],
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "developmentClient": false,
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "enterpriseProvisioning": "adhoc"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

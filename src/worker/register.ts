@@ -10,8 +10,8 @@
 
 import { normalizeRef, RefError } from "../shared/ref.js";
 import {
-  isPlatform,
   type BuildPointer,
+  isPlatform,
   type Platform,
   type RegisterBuild,
   type RegisterRequest,
@@ -46,10 +46,12 @@ function str(v: unknown, field: string, max = 200): string {
 }
 
 function parseBuild(raw: unknown, index: number): RegisterBuild {
-  if (typeof raw !== "object" || raw === null) throw new BadRequest(`builds[${index}] is not an object`);
+  if (typeof raw !== "object" || raw === null)
+    throw new BadRequest(`builds[${index}] is not an object`);
   const b = raw as Record<string, unknown>;
 
-  if (!isPlatform(b.platform)) throw new BadRequest(`builds[${index}].platform must be ios or android`);
+  if (!isPlatform(b.platform))
+    throw new BadRequest(`builds[${index}].platform must be ios or android`);
 
   const buildId = str(b.buildId, `builds[${index}].buildId`, 64);
   if (!UUID_RE.test(buildId)) throw new BadRequest(`builds[${index}].buildId must be a uuid`);

@@ -14,12 +14,12 @@
 
 import * as core from "@actions/core";
 import { context } from "@actions/github";
-import type { BuildState, Platform, PointerStatusJson } from "../shared/types.js";
 import { normalizeRef } from "../shared/ref.js";
+import type { BuildState, Platform, PointerStatusJson } from "../shared/types.js";
 import { normalizeBaseUrl, permalink, qrUrl } from "../shared/urls.js";
 import { findStickyCommentBody, upsertStickyComment } from "./comment.js";
-import { cancelBuilds, triggerBuilds, type StartedBuild } from "./eas.js";
-import { marker, parsePreviousBuildIds, renderComment, type PlatformRow } from "./markdown.js";
+import { cancelBuilds, type StartedBuild, triggerBuilds } from "./eas.js";
+import { marker, type PlatformRow, parsePreviousBuildIds, renderComment } from "./markdown.js";
 import { register, waitForBuilds } from "./register.js";
 
 function boolInput(name: string, fallback: boolean): boolean {
@@ -48,9 +48,7 @@ async function run(): Promise<void> {
   const repo = context.repo.repo;
 
   if (!pr) {
-    core.setFailed(
-      "This action expects a pull_request event. Trigger it with `on: pull_request`.",
-    );
+    core.setFailed("This action expects a pull_request event. Trigger it with `on: pull_request`.");
     return;
   }
 
@@ -107,7 +105,9 @@ async function run(): Promise<void> {
       );
       supersededIds = parsePreviousBuildIds(previousBody);
     } catch (err) {
-      core.debug(`Could not read the previous comment: ${err instanceof Error ? err.message : err}`);
+      core.debug(
+        `Could not read the previous comment: ${err instanceof Error ? err.message : err}`,
+      );
     }
   }
 

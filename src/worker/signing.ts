@@ -37,7 +37,11 @@ export async function signPermalink(
   secret: string,
 ): Promise<string> {
   const key = await hmacKey(secret);
-  const mac = await crypto.subtle.sign("HMAC", key, encoder.encode(`${expiryEpochSeconds}:${pathname}`));
+  const mac = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(`${expiryEpochSeconds}:${pathname}`),
+  );
   return `${expiryEpochSeconds}.${base64UrlEncode(mac)}`;
 }
 
@@ -70,7 +74,9 @@ export async function verifySignedPermalink(request: Request, env: Env): Promise
 
   // Sign the canonical permalink path, so /ios, /ios/artifact and /ios.json
   // all verify against the same signature the comment carries.
-  const canonical = url.pathname.replace(/\/(artifact|qr\.png|qr\.svg)$/, "").replace(/\.json$/, "");
+  const canonical = url.pathname
+    .replace(/\/(artifact|qr\.png|qr\.svg)$/, "")
+    .replace(/\.json$/, "");
   const expected = await signPermalink(canonical, expiry, secret);
   return timingSafeEqual(token, expected);
 }

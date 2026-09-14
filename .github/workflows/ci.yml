@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # `biome ci` rather than `biome check`: it is read-only and emits GitHub
+      # annotations instead of rewriting files under CI.
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Worker binding types are current
+        run: pnpm exec wrangler types --check
+
+      - name: Typecheck
+        run: |
+          pnpm exec tsc --noEmit
+          pnpm exec tsc --noEmit -p tsconfig.action.json
+
+      - name: Test
+        run: pnpm test
+
+      # Not matrixed across Node versions on purpose: the Worker runs on
+      # workerd, so the Node version only affects the toolchain.
+      - name: Build the action bundle
+        run: pnpm build
+
+      - name: Worker builds
+        run: pnpm exec wrangler deploy --dry-run
